@@ -259,13 +259,9 @@ app.get('/api/forecast/:city', async (req, res) => {
   }
 });
 
-// React 빌드 파일 제공
+// React 빌드 파일 제공 (정적 파일만 서빙)
 app.use(express.static(path.join(__dirname, 'client/build')));
 
-// 모든 라우트를 React 앱으로 전달 (API 라우트 제외)
-app.get('/*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/build/index.html'));
-});
 
 app.listen(PORT, () => {
   console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
