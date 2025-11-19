@@ -71,8 +71,8 @@ app.get('/api/weather/:city', async (req, res) => {
       return res.status(404).json({ error: '지원하지 않는 도시입니다. (seoul, busan, tokyo, london 등 사용 가능)' });
     }
 
-    // Open-Meteo API 호출 (API 키 불필요)
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m&timezone=auto`;
+    // Open-Meteo API 호출 (API 키 불필요) - HTTP 사용
+    const url = `http://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m&timezone=auto`;
 
     console.log('API 호출 중...');
     const response = await axios.get(url);
@@ -191,8 +191,8 @@ app.get('/api/forecast/:city', async (req, res) => {
       return res.status(404).json({ error: '지원하지 않는 도시입니다.' });
     }
 
-    // Open-Meteo API 호출 (7일 예보)
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=auto&forecast_days=7`;
+    // Open-Meteo API 호출 (7일 예보) - HTTP 사용
+    const url = `http://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=auto&forecast_days=7`;
 
     console.log('예보 API 호출 중...');
     const response = await axios.get(url);
