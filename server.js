@@ -1,6 +1,7 @@
 const express = require('express');
-const path = require('path');
 const cors = require('cors');
+const path = require('path');
+const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -69,7 +70,6 @@ app.get('/api/weather/:city', async (req, res) => {
     // Open-Meteo API 호출 (API 키 불필요)
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m&timezone=auto`;
 
-    const fetch = (await import('node-fetch')).default;
     const response = await fetch(url);
     console.log('response status:', response.status);
     const data = await response.json();
@@ -216,7 +216,6 @@ app.get('/api/forecast/:city', async (req, res) => {
     // Open-Meteo API 호출 (7일 예보)
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&timezone=auto&forecast_days=7`;
 
-    const fetch = (await import('node-fetch')).default;
     const response = await fetch(url);
     const data = await response.json();
 
