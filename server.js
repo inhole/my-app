@@ -113,8 +113,16 @@ app.get('/api/weather/:city', async (req, res) => {
       res.status(500).json({ error: '날씨 데이터를 가져올 수 없습니다.' });
     }
   } catch (error) {
-    console.error('Error:', error.message);
-    res.status(500).json({ error: '서버 오류가 발생했습니다.' });
+    console.error('=== Weather API Error ===');
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
+    console.error('Error response:', error.response?.status, error.response?.statusText);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      error: '서버 오류가 발생했습니다.',
+      detail: error.message,
+      code: error.code
+    });
   }
 });
 
