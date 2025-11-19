@@ -81,7 +81,34 @@ app.get('/api/weather/:city', async (req, res) => {
     console.log('data: ', data);
 
     if (response.status === 200 && data.current) {
-      // ...existing code...
+      // OpenWeatherMap 형식으로 변환
+      const weatherData = {
+        cod: 200,
+        name: coords.name,
+        coord: { lat: coords.lat, lon: coords.lon },
+        sys: {
+          country: getCountryCode(city)
+        },
+        main: {
+          temp: data.current.temperature_2m,
+          feels_like: data.current.apparent_temperature,
+          humidity: data.current.relative_humidity_2m,
+          pressure: 1013,
+        },
+        weather: [{
+          id: data.current.weather_code,
+          main: getWeatherDescription(data.current.weather_code),
+          description: getWeatherDescription(data.current.weather_code),
+          icon: getWeatherIcon(data.current.weather_code),
+        }],
+        wind: {
+          speed: data.current.wind_speed_10m,
+          deg: data.current.wind_direction_10m,
+        },
+      };
+
+      setCachedData(cacheKey, weatherData);
+      res.json(weatherData);
     } else {
       res.status(500).json({ error: '날씨 데이터를 가져올 수 없습니다.' });
     }
