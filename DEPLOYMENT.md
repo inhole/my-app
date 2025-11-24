@@ -1,4 +1,4 @@
-# 🌤️ 날씨 앱 EC2 배포 가이드
+# 🌤️ 날씨 및 도서 관리 앱 EC2 배포 가이드
 
 ## 📋 목차
 1. [EC2 인스턴스 설정](#1-ec2-인스턴스-설정)
@@ -14,7 +14,7 @@
 ### 1.1 EC2 인스턴스 생성
 1. AWS Console → EC2 → "인스턴스 시작" 클릭
 2. 설정:
-   - **이름**: my-app
+   - **이름**: ino
    - **AMI**: Ubuntu Server 22.04 LTS
    - **인스턴스 타입**: t2.micro (프리티어)
    - **키 페어**: 새로 생성 또는 기존 키 선택 (다운로드 보관!)
@@ -22,7 +22,8 @@
      - SSH (22) - 내 IP
      - HTTP (80) - 0.0.0.0/0
      - HTTPS (443) - 0.0.0.0/0
-     - Custom TCP (5000) - 0.0.0.0/0 (테스트용)
+     - Custom TCP (3000) - 0.0.0.0/0 (Next.js 앱용)
+     - Custom TCP (5000) - 0.0.0.0/0 (백엔드 API용)
 
 ### 1.2 Elastic IP 할당 (선택사항)
 1. EC2 → 탄력적 IP → "탄력적 IP 주소 할당"
@@ -48,14 +49,21 @@ sudo apt update
 sudo apt upgrade -y
 ```
 
-### 2.2 Node.js 설치
+### 2.2 Node.js 설치 (NVM 사용)
 ```bash
+# NVM 설치 확인 (이미 설치됨 가정)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+
+# NVM 로드
+source ~/.bashrc
+
 # Node.js 20.x 설치
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
+nvm install 20
+nvm use 20
+nvm alias default 20
 
 # 설치 확인
-node --version
+node --version  # v20.x 이상
 npm --version
 ```
 
@@ -87,7 +95,7 @@ sudo apt install -y nginx
 #### 방법 A: Git 사용 (추천)
 ```bash
 # GitHub에 코드 푸시 후
-cd /home/ubuntu
+cd /home/ec2-user
 git clone https://github.com/your-username/your-repo.git my-app
 cd my-app
 ```
@@ -98,22 +106,15 @@ cd my-app
 scp -i "your-key.pem" -r D:/개인/ino ubuntu@your-ec2-public-ip:/home/ubuntu/my-app
 ```
 
-#### 방법 C: 수동 생성
-```bash
-mkdir -p /home/ubuntu/my-app
-cd /home/ubuntu/my-app
-# 파일들을 하나씩 생성하거나 FTP로 업로드
-```
-
 ### 3.2 의존성 설치 및 빌드
 ```bash
 cd /home/ubuntu/my-app
 
-# 서버 의존성 설치
+# 백엔드 의존성 설치
 npm install --production
 
-# 클라이언트 빌드
-cd client
+# 프론트엔드 의존성 설치 및 빌드
+cd frontend
 npm install
 npm run build
 cd ..
@@ -121,14 +122,20 @@ cd ..
 
 ### 3.3 PM2로 앱 실행
 ```bash
-# 앱 시작
+# 백엔드 실행
 pm2 start ecosystem.config.js
+
+# 프론트엔드 실행 (Next.js)
+cd frontend
+pm2 start "npm run start" --name "frontend-app"
+cd ..
 
 # 상태 확인
 pm2 status
 
 # 로그 확인
-pm2 logs my-app
+pm2 logs backend-app
+pm2 logs frontend-app
 
 # PM2 설정 저장 (재부팅 시 자동 시작)
 pm2 save
@@ -153,12 +160,35 @@ sudo nano /etc/nginx/sites-available/my-app
 
 ### 4.2 설정 내용 입력
 ```nginx
+# 업스트림 설정
+upstream backend_api {
+    server localhost:5000;
+}
+
+upstream frontend_app {
+    server localhost:3000;
+}
+
 server {
     listen 80;
     server_name your-ec2-public-ip-or-domain;
 
+    # 프론트엔드 (Next.js)
     location / {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://frontend_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 백엔드 API
+    location /api/ {
+        proxy_pass http://backend_api;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -217,16 +247,20 @@ sudo certbot renew --dry-run
 pm2 status
 
 # 로그 실시간 확인
-pm2 logs my-app
+pm2 logs backend-app
+pm2 logs frontend-app
 
 # 앱 재시작
-pm2 restart my-app
+pm2 restart backend-app
+pm2 restart frontend-app
 
 # 앱 중지
-pm2 stop my-app
+pm2 stop backend-app
+pm2 stop frontend-app
 
 # 앱 삭제
-pm2 delete my-app
+pm2 delete backend-app
+pm2 delete frontend-app
 
 # 모니터링
 pm2 monit
@@ -239,15 +273,21 @@ cd /home/ubuntu/my-app
 # Git 사용 시
 git pull origin main
 
-# 또는 배포 스크립트 실행
-chmod +x deploy.sh
-./deploy.sh
+# 백엔드 재시작
+pm2 restart backend-app
+
+# 프론트엔드 재빌드 및 재시작
+cd frontend
+npm run build
+pm2 restart frontend-app
+cd ..
 ```
 
 ### 6.3 로그 확인
 ```bash
 # PM2 로그
-pm2 logs my-app
+pm2 logs backend-app
+pm2 logs frontend-app
 
 # Nginx 로그
 sudo tail -f /var/log/nginx/access.log
@@ -269,11 +309,13 @@ du -sh /home/ubuntu/my-app
 
 ### 앱이 실행되지 않는 경우
 ```bash
-# 포트 5000이 사용 중인지 확인
+# 포트 3000, 5000 사용 확인
+sudo lsof -i :3000
 sudo lsof -i :5000
 
 # PM2 로그 확인
-pm2 logs my-app --lines 100
+pm2 logs backend-app --lines 100
+pm2 logs frontend-app --lines 100
 
 # Node.js 버전 확인
 node --version
@@ -331,8 +373,9 @@ sudo systemctl start fail2ban
 - [ ] SSH 접속 확인
 - [ ] Node.js 및 PM2 설치
 - [ ] 코드 업로드 (Git 또는 SCP)
-- [ ] 의존성 설치 및 빌드
-- [ ] PM2로 앱 실행
+- [ ] 백엔드 및 프론트엔드 의존성 설치
+- [ ] 프론트엔드 빌드
+- [ ] PM2로 백엔드 및 프론트엔드 실행
 - [ ] Nginx 설정 및 활성화
 - [ ] 브라우저에서 접속 테스트
 - [ ] 도메인 연결 (선택)
@@ -345,7 +388,8 @@ sudo systemctl start fail2ban
 
 배포 완료 후:
 - **HTTP**: `http://your-ec2-public-ip`
-- **직접 포트**: `http://your-ec2-public-ip:5000`
+- **프론트엔드 직접**: `http://your-ec2-public-ip:3000`
+- **백엔드 API 직접**: `http://your-ec2-public-ip:5000`
 - **도메인**: `http://your-domain.com`
 - **HTTPS**: `https://your-domain.com` (SSL 설정 시)
 
@@ -353,7 +397,7 @@ sudo systemctl start fail2ban
 
 ## 💡 팁
 
-1. **개발/프로덕션 분리**: 환경 변수로 API 키 등 관리
+1. **환경 변수 관리**: `.env.local` 파일로 API 키 등 관리
 2. **로그 로테이션**: PM2와 Nginx 로그가 쌓이므로 정기적으로 관리
 3. **백업**: 정기적으로 코드와 설정 백업
 4. **모니터링**: CloudWatch 또는 PM2 Plus 사용
@@ -363,8 +407,7 @@ sudo systemctl start fail2ban
 
 ## 📞 문제 발생 시
 
-1. PM2 로그 확인: `pm2 logs my-app`
+1. PM2 로그 확인: `pm2 logs backend-app` / `pm2 logs frontend-app`
 2. Nginx 오류 로그: `sudo tail -f /var/log/nginx/error.log`
-3. 포트 확인: `sudo netstat -tlnp | grep :5000`
+3. 포트 확인: `sudo netstat -tlnp | grep :3000` / `sudo netstat -tlnp | grep :5000`
 4. 프로세스 확인: `pm2 status`
-

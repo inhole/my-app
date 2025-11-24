@@ -1,8 +1,8 @@
 // PM2 설정 파일
 module.exports = {
   apps: [{
-    name: 'my-app',
-    script: './server.js',
+    name: 'backend-app',
+    script: './backend/dist/server.js',
     exec_mode: 'fork',  // cluster 대신 fork 모드 사용
     instances: 1,
     autorestart: true,
@@ -14,4 +14,3 @@ module.exports = {
     }
   }]
 };
-

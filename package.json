@@ -1,29 +1,30 @@
 {
   "name": "ino",
   "version": "1.0.0",
-  "main": "server.js",
+  "description": "Weather and Book Management Web Application",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "start": "ts-node server.ts",
-    "server": "nodemon --exec ts-node server.ts",
-    "client": "npm start --prefix client",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "build": "npm install && cd client && npm install && npm run build"
+    "install:all": "npm install",
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
+    "start": "concurrently \"npm run start --workspace=backend\" \"npm run start --workspace=frontend\"",
+    "lint": "npm run lint --workspace=frontend",
+    "clean": "rm -rf backend/dist frontend/.next frontend/build"
   },
-  "keywords": [],
+  "keywords": [
+    "weather",
+    "book",
+    "management",
+    "react",
+    "nextjs",
+    "nodejs",
+    "typescript"
+  ],
   "author": "",
-  "license": "ISC",
-  "description": "Weather App with React and Node.js",
-  "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^5.1.0"
-  },
-  "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.5",
-    "@types/node": "^24.10.1",
-    "concurrently": "^8.2.2",
-    "nodemon": "^3.0.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.9.3"
-  }
+  "license": "ISC"
 }
+
