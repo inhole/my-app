@@ -1,22 +1,68 @@
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const { exec } = require('child_process');
-const { promisify } = require('util');
+import { Request, Response } from 'express';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 
 const execPromise = promisify(exec);
 
-const app = express();
-const PORT = process.env.PORT || 5000;
+interface CityCoords {
+  lat: number;
+  lon: number;
+  name: string;
+}
 
+interface CachedData {
+  data: any;
+  timestamp: number;
+}
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+interface WeatherData {
+  cod: number;
+  name: string;
+  coord: { lat: number; lon: number };
+  sys: { country: string };
+  main: {
+    temp: number;
+    feels_like: number;
+    humidity: number;
+    pressure: number;
+  };
+  weather: Array<{
+    id: number;
+    main: string;
+    description: string;
+    icon: string;
+  }>;
+  wind: { speed: number; deg: number };
+}
+
+interface ForecastData {
+  cod: string;
+  city: {
+    name: string;
+    coord: { lat: number; lon: number };
+  };
+  list: Array<{
+    dt: number;
+    dt_txt: string;
+    main: {
+      temp: number;
+      temp_max: number;
+      temp_min: number;
+    };
+    weather: Array<{
+      id: number;
+      main: string;
+      description: string;
+      icon: string;
+    }>;
+    wind: { speed: number };
+    pop: number;
+  }>;
+}
 
 // Open-Meteo API 설정 (API 키 불필요!)
 // 도시명 -> 좌표 변환을 위한 간단한 매핑
-const cityCoords = {
+const cityCoords: Record<string, CityCoords> = {
   'seoul': { lat: 37.5665, lon: 126.9780, name: '서울' },
   'busan': { lat: 35.1796, lon: 129.0756, name: '부산' },
   'incheon': { lat: 37.4563, lon: 126.7052, name: '인천' },
@@ -36,7 +82,7 @@ const cityCoords = {
 const cache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5분
 
-function getCachedData(key) {
+function getCachedData(key: string): any {
   const cached = cache.get(key);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     console.log('캐시에서 데이터 반환:', key);
@@ -45,15 +91,96 @@ function getCachedData(key) {
   return null;
 }
 
-function setCachedData(key, data) {
+function setCachedData(key: string, data: any): void {
   cache.set(key, {
     data,
     timestamp: Date.now()
   });
 }
 
-// API 엔드포인트
-app.get('/api/weather/:city', async (req, res) => {
+// WMO Weather Code를 설명으로 변환하는 함수
+function getWeatherDescription(code: number): string {
+  const weatherCodes: Record<number, string> = {
+    0: '맑음',
+    1: '대체로 맑음',
+    2: '부분적으로 흐림',
+    3: '흐림',
+    45: '안개',
+    48: '짙은 안개',
+    51: '가벼운 이슬비',
+    53: '이슬비',
+    55: '강한 이슬비',
+    61: '약한 비',
+    63: '비',
+    65: '강한 비',
+    71: '약한 눈',
+    73: '눈',
+    75: '강한 눈',
+    77: '진눈깨비',
+    80: '약한 소나기',
+    81: '소나기',
+    82: '강한 소나기',
+    85: '약한 눈 소나기',
+    86: '눈 소나기',
+    95: '천둥번개',
+    96: '우박을 동반한 천둥번개',
+    99: '강한 우박을 동반한 천둥번개',
+  };
+  return weatherCodes[code] || '알 수 없음';
+}
+
+// WMO Weather Code를 OpenWeatherMap 아이콘 코드로 변환
+function getWeatherIcon(code: number): string {
+  const iconMap: Record<number, string> = {
+    0: '01d',    // 맑음
+    1: '02d',    // 대체로 맑음
+    2: '03d',    // 부분적으로 흐림
+    3: '04d',    // 흐림
+    45: '50d',   // 안개
+    48: '50d',   // 짙은 안개
+    51: '09d',   // 가벼운 이슬비
+    53: '09d',   // 이슬비
+    55: '09d',   // 강한 이슬비
+    61: '10d',   // 약한 비
+    63: '10d',   // 비
+    65: '10d',   // 강한 비
+    71: '13d',   // 약한 눈
+    73: '13d',   // 눈
+    75: '13d',   // 강한 눈
+    77: '13d',   // 진눈깨비
+    80: '09d',   // 약한 소나기
+    81: '09d',   // 소나기
+    82: '09d',   // 강한 소나기
+    85: '13d',   // 약한 눈 소나기
+    86: '13d',   // 눈 소나기
+    95: '11d',   // 천둥번개
+    96: '11d',   // 우박을 동반한 천둥번개
+    99: '11d',   // 강한 우박을 동반한 천둥번개
+  };
+  return iconMap[code] || '01d';
+}
+
+// 도시명으로 국가 코드 반환
+function getCountryCode(city: string): string {
+  const countryMap: Record<string, string> = {
+    'seoul': 'KR',
+    'busan': 'KR',
+    'incheon': 'KR',
+    'daegu': 'KR',
+    'daejeon': 'KR',
+    'gwangju': 'KR',
+    'ulsan': 'KR',
+    'suwon': 'KR',
+    'jeju': 'KR',
+    'tokyo': 'JP',
+    'london': 'GB',
+    'paris': 'FR',
+    'new york': 'US',
+  };
+  return countryMap[city] || '';
+}
+
+const getWeather = async (req: Request, res: Response) => {
   try {
     console.log('req.params.city: ', req.params.city);
     const city = req.params.city.toLowerCase();
@@ -68,7 +195,8 @@ app.get('/api/weather/:city', async (req, res) => {
     // 도시 좌표 찾기
     const coords = cityCoords[city];
     if (!coords) {
-      return res.status(404).json({ error: '지원하지 않는 도시입니다. (seoul, busan, tokyo, london 등 사용 가능)' });
+      res.status(404).json({ error: '지원하지 않는 도시입니다. (seoul, busan, tokyo, london 등 사용 가능)' });
+      return;
     }
 
     // Open-Meteo API 호출 (API 키 불필요) - HTTP 사용, curl로 우회
@@ -84,7 +212,7 @@ app.get('/api/weather/:city', async (req, res) => {
 
     if (data && data.current) {
       // OpenWeatherMap 형식으로 변환
-      const weatherData = {
+      const weatherData: WeatherData = {
         cod: 200,
         name: coords.name,
         coord: { lat: coords.lat, lon: coords.lon },
@@ -115,103 +243,21 @@ app.get('/api/weather/:city', async (req, res) => {
       res.status(500).json({ error: '날씨 데이터를 가져올 수 없습니다.' });
     }
   } catch (error) {
+    const err = error as Error;
     console.error('=== Weather API Error ===');
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
-    console.error('Error response:', error.response?.status, error.response?.statusText);
-    console.error('Error stack:', error.stack);
+    console.error('Error message:', err.message);
+    console.error('Error code:', (err as any).code);
+    console.error('Error response:', (err as any).response?.status, (err as any).response?.statusText);
+    console.error('Error stack:', err.stack);
     res.status(500).json({
       error: '서버 오류가 발생했습니다.',
-      detail: error.message,
-      code: error.code
+      detail: err.message,
+      code: (err as any).code
     });
   }
-});
+};
 
-// WMO Weather Code를 설명으로 변환하는 함수
-function getWeatherDescription(code) {
-  const weatherCodes = {
-    0: '맑음',
-    1: '대체로 맑음',
-    2: '부분적으로 흐림',
-    3: '흐림',
-    45: '안개',
-    48: '짙은 안개',
-    51: '가벼운 이슬비',
-    53: '이슬비',
-    55: '강한 이슬비',
-    61: '약한 비',
-    63: '비',
-    65: '강한 비',
-    71: '약한 눈',
-    73: '눈',
-    75: '강한 눈',
-    77: '진눈깨비',
-    80: '약한 소나기',
-    81: '소나기',
-    82: '강한 소나기',
-    85: '약한 눈 소나기',
-    86: '눈 소나기',
-    95: '천둥번개',
-    96: '우박을 동반한 천둥번개',
-    99: '강한 우박을 동반한 천둥번개',
-  };
-  return weatherCodes[code] || '알 수 없음';
-}
-
-// WMO Weather Code를 OpenWeatherMap 아이콘 코드로 변환
-function getWeatherIcon(code) {
-  const iconMap = {
-    0: '01d',    // 맑음
-    1: '02d',    // 대체로 맑음
-    2: '03d',    // 부분적으로 흐림
-    3: '04d',    // 흐림
-    45: '50d',   // 안개
-    48: '50d',   // 짙은 안개
-    51: '09d',   // 가벼운 이슬비
-    53: '09d',   // 이슬비
-    55: '09d',   // 강한 이슬비
-    61: '10d',   // 약한 비
-    63: '10d',   // 비
-    65: '10d',   // 강한 비
-    71: '13d',   // 약한 눈
-    73: '13d',   // 눈
-    75: '13d',   // 강한 눈
-    77: '13d',   // 진눈깨비
-    80: '09d',   // 약한 소나기
-    81: '09d',   // 소나기
-    82: '09d',   // 강한 소나기
-    85: '13d',   // 약한 눈 소나기
-    86: '13d',   // 눈 소나기
-    95: '11d',   // 천둥번개
-    96: '11d',   // 우박을 동반한 천둥번개
-    99: '11d',   // 강한 우박을 동반한 천둥번개
-  };
-  return iconMap[code] || '01d';
-}
-
-// 도시명으로 국가 코드 반환
-function getCountryCode(city) {
-  const countryMap = {
-    'seoul': 'KR',
-    'busan': 'KR',
-    'incheon': 'KR',
-    'daegu': 'KR',
-    'daejeon': 'KR',
-    'gwangju': 'KR',
-    'ulsan': 'KR',
-    'suwon': 'KR',
-    'jeju': 'KR',
-    'tokyo': 'JP',
-    'london': 'GB',
-    'paris': 'FR',
-    'new york': 'US',
-  };
-  return countryMap[city] || '';
-}
-
-// 5일 예보 API
-app.get('/api/forecast/:city', async (req, res) => {
+const getForecast = async (req: Request, res: Response) => {
   try {
     const city = req.params.city.toLowerCase();
     const cacheKey = `forecast_${city}`;
@@ -239,13 +285,13 @@ app.get('/api/forecast/:city', async (req, res) => {
 
     if (data && data.daily) {
       // OpenWeatherMap 형식으로 변환
-      const forecastData = {
+      const forecastData: ForecastData = {
         cod: '200',
         city: {
           name: coords.name,
           coord: { lat: coords.lat, lon: coords.lon },
         },
-        list: data.daily.time.map((time, index) => ({
+        list: data.daily.time.map((time: string, index: number) => ({
           dt: new Date(time).getTime() / 1000,
           dt_txt: time,
           main: {
@@ -272,18 +318,15 @@ app.get('/api/forecast/:city', async (req, res) => {
       res.status(500).json({ error: '예보 데이터를 가져올 수 없습니다.' });
     }
   } catch (error) {
+    const err = error as Error;
     console.error('=== Forecast API Error ===');
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({ error: '서버 오류가 발생했습니다.', detail: error.message });
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    res.status(500).json({ error: '서버 오류가 발생했습니다.', detail: err.message });
   }
-});
+};
 
-// React 빌드 파일 제공 (정적 파일만 서빙)
-app.use(express.static(path.join(__dirname, 'client/build')));
-
-
-app.listen(PORT, () => {
-  console.log(`서버가 포트 ${PORT}에서 실행 중입니다.`);
-});
-
+export {
+  getWeather,
+  getForecast,
+};
