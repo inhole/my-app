@@ -1,7 +1,7 @@
 // PM2 설정 파일
 module.exports = {
   apps: [{
-    name: 'weather-app',
+    name: 'my-app',
     script: './server.js',
     exec_mode: 'fork',  // cluster 대신 fork 모드 사용
     instances: 1,

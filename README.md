@@ -126,7 +126,7 @@ pm2 start ecosystem.config.js
 pm2 status
 
 # 로그 확인
-pm2 logs weather-app
+pm2 logs my-app
 ```
 
 ## 📦 배포 파일

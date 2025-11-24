@@ -14,7 +14,7 @@
 ### 1.1 EC2 인스턴스 생성
 1. AWS Console → EC2 → "인스턴스 시작" 클릭
 2. 설정:
-   - **이름**: weather-app
+   - **이름**: my-app
    - **AMI**: Ubuntu Server 22.04 LTS
    - **인스턴스 타입**: t2.micro (프리티어)
    - **키 페어**: 새로 생성 또는 기존 키 선택 (다운로드 보관!)
@@ -88,26 +88,26 @@ sudo apt install -y nginx
 ```bash
 # GitHub에 코드 푸시 후
 cd /home/ubuntu
-git clone https://github.com/your-username/your-repo.git weather-app
-cd weather-app
+git clone https://github.com/your-username/your-repo.git my-app
+cd my-app
 ```
 
 #### 방법 B: SCP 사용 (로컬에서 업로드)
 ```bash
 # 로컬 컴퓨터에서 실행
-scp -i "your-key.pem" -r D:/개인/ino ubuntu@your-ec2-public-ip:/home/ubuntu/weather-app
+scp -i "your-key.pem" -r D:/개인/ino ubuntu@your-ec2-public-ip:/home/ubuntu/my-app
 ```
 
 #### 방법 C: 수동 생성
 ```bash
-mkdir -p /home/ubuntu/weather-app
-cd /home/ubuntu/weather-app
+mkdir -p /home/ubuntu/my-app
+cd /home/ubuntu/my-app
 # 파일들을 하나씩 생성하거나 FTP로 업로드
 ```
 
 ### 3.2 의존성 설치 및 빌드
 ```bash
-cd /home/ubuntu/weather-app
+cd /home/ubuntu/my-app
 
 # 서버 의존성 설치
 npm install --production
@@ -128,7 +128,7 @@ pm2 start ecosystem.config.js
 pm2 status
 
 # 로그 확인
-pm2 logs weather-app
+pm2 logs my-app
 
 # PM2 설정 저장 (재부팅 시 자동 시작)
 pm2 save
@@ -148,7 +148,7 @@ sudo ufw enable
 
 ### 4.1 Nginx 설정 파일 생성
 ```bash
-sudo nano /etc/nginx/sites-available/weather-app
+sudo nano /etc/nginx/sites-available/my-app
 ```
 
 ### 4.2 설정 내용 입력
@@ -174,7 +174,7 @@ server {
 ### 4.3 설정 활성화
 ```bash
 # 심볼릭 링크 생성
-sudo ln -s /etc/nginx/sites-available/weather-app /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/my-app /etc/nginx/sites-enabled/
 
 # 기본 설정 제거 (선택사항)
 sudo rm /etc/nginx/sites-enabled/default
@@ -217,16 +217,16 @@ sudo certbot renew --dry-run
 pm2 status
 
 # 로그 실시간 확인
-pm2 logs weather-app
+pm2 logs my-app
 
 # 앱 재시작
-pm2 restart weather-app
+pm2 restart my-app
 
 # 앱 중지
-pm2 stop weather-app
+pm2 stop my-app
 
 # 앱 삭제
-pm2 delete weather-app
+pm2 delete my-app
 
 # 모니터링
 pm2 monit
@@ -234,7 +234,7 @@ pm2 monit
 
 ### 6.2 업데이트 배포
 ```bash
-cd /home/ubuntu/weather-app
+cd /home/ubuntu/my-app
 
 # Git 사용 시
 git pull origin main
@@ -247,7 +247,7 @@ chmod +x deploy.sh
 ### 6.3 로그 확인
 ```bash
 # PM2 로그
-pm2 logs weather-app
+pm2 logs my-app
 
 # Nginx 로그
 sudo tail -f /var/log/nginx/access.log
@@ -260,7 +260,7 @@ sudo journalctl -u nginx
 ### 6.4 디스크 용량 확인
 ```bash
 df -h
-du -sh /home/ubuntu/weather-app
+du -sh /home/ubuntu/my-app
 ```
 
 ---
@@ -273,7 +273,7 @@ du -sh /home/ubuntu/weather-app
 sudo lsof -i :5000
 
 # PM2 로그 확인
-pm2 logs weather-app --lines 100
+pm2 logs my-app --lines 100
 
 # Node.js 버전 확인
 node --version
@@ -363,7 +363,7 @@ sudo systemctl start fail2ban
 
 ## 📞 문제 발생 시
 
-1. PM2 로그 확인: `pm2 logs weather-app`
+1. PM2 로그 확인: `pm2 logs my-app`
 2. Nginx 오류 로그: `sudo tail -f /var/log/nginx/error.log`
 3. 포트 확인: `sudo netstat -tlnp | grep :5000`
 4. 프로세스 확인: `pm2 status`
