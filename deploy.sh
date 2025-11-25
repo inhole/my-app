@@ -11,10 +11,6 @@ ROOT_DIR="/home/ec2-user/my-app"
 # 1. 이동
 cd "$ROOT_DIR"
 
-# 2. Git pull
-echo "📦 Git pull 최신 코드 가져오기..."
-git pull origin main
-
 # 3. 서버 의존성 설치 (backend)
 echo "📦 서버 의존성 설치 (backend)..."
 if [ -d "backend" ]; then
