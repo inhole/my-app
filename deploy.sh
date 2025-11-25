@@ -19,14 +19,21 @@ git pull origin main
 echo "📦 서버 의존성 설치 (backend)..."
 if [ -d "backend" ]; then
   cd backend
-  if [ -f package-lock.json ]; then
-    npm ci --production
+  # Install dev deps temporarily if tsc isn't available, to allow `npm run build`.
+  if ! command -v tsc >/dev/null 2>&1; then
+    echo "tsc not found globally — installing devDependencies temporarily for build"
+    npm install
+    NEED_CLEANUP=1
   else
-    npm install --production
+    npm ci --production
   fi
   # Build TypeScript server if build script exists
   if npm run | grep -q "build"; then
     npm run build || true
+  fi
+  # If we installed dev deps, prune to production-only to keep install lean
+  if [ "${NEED_CLEANUP:-0}" = "1" ]; then
+    npm prune --production || true
   fi
   cd "$ROOT_DIR"
 else

@@ -22,10 +22,10 @@ module.exports = {
     },
     {
       name: 'frontend-app',
-      // Run Next.js directly using Node to avoid invoking the system npm shell wrapper
-      // Uses the local next binary path under node_modules to guarantee correct executable.
-      script: 'node',
-      args: ['/home/ec2-user/my-app/frontend/node_modules/next/dist/bin/next.js', 'start', '-H', '0.0.0.0', '-p', '3000'],
+      // Use a small launcher script that reliably resolves the local next binary
+      script: '/home/ec2-user/my-app/frontend/start-next.js',
+      // ensure pm2 uses node to run the launcher
+      interpreter: 'node',
       cwd: '/home/ec2-user/my-app/frontend',
       exec_mode: 'fork',
       instances: 1,
